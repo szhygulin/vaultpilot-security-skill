@@ -1,5 +1,7 @@
 # VaultPilot Guard — agent-side skill for `vaultpilot-mcp`
 
+> DeFi for AI agents, designed for when the AI can be compromised. Agent proposes, you approve.
+
 An independent Claude Code skill that enforces bytes-verification invariants
 for transactions prepared by [`vaultpilot-mcp`](https://github.com/szhygulin/vaultpilot-mcp).
 
