@@ -3,6 +3,8 @@ name: vaultpilot-preflight
 description: Use whenever the user's request involves vaultpilot-mcp tools (prepare_*, preview_send, preview_solana_send, send_transaction, pair_ledger_*). Enforces agent-side integrity checks that do not depend on MCP-emitted instruction text, so a compromised MCP omitting its own CHECKS PERFORMED directives still gets caught.
 ---
 
+<!-- VAULTPILOT_PREFLIGHT_INTEGRITY_v1_7780bfeee9a49f01 -->
+
 # VaultPilot preflight — agent-side integrity invariants
 
 You are assisting a user with a self-custodial transaction signed on a Ledger

@@ -40,6 +40,55 @@ git pull --ff-only
 Diff the new `SKILL.md` against the current one before pulling if you
 want to audit the change. See `CHANGELOG.md` for per-version notes.
 
+## Integrity pin (coordinated with `vaultpilot-mcp`)
+
+Starting with 0.2.0, `SKILL.md` carries an invisible integrity sentinel
+near the top and `vaultpilot-mcp` pins the expected SHA-256 of this file
+in its server source code. On every signing flow, the agent is instructed
+to:
+
+1. Run `sha256sum SKILL.md` and compare to the pinned value.
+2. Confirm the sentinel is present in the content returned by the `Skill`
+   tool (not in the MCP's own instructions text, which reference the
+   sentinel only by fragments so a naïve context-scan can't spoof it).
+
+This catches two attacks a static marker alone cannot:
+
+- **Targeted tamper of `SKILL.md` on disk.** An attacker with local write
+  access cannot forge content that hashes to the pinned value.
+- **Plugin collision (different skill registered under the same name).**
+  The colliding skill's content won't contain the sentinel, so the
+  post-load check fails.
+
+Residual: a compromise of the `vaultpilot-mcp` npm package itself would
+also ship the attacker's pin — that's the same trust floor as the rest
+of the MCP, not a new gap.
+
+### Maintainer update workflow
+
+When `SKILL.md` changes in this repo, the pin in `vaultpilot-mcp` must
+change with it. The coordinated release:
+
+1. Edit `SKILL.md` on a feature branch in this repo.
+2. `sha256sum SKILL.md` — record the new hash.
+3. In `vaultpilot-mcp/src/index.ts`, find the `PREFLIGHT SKILL INTEGRITY
+   PIN` block inside the server `instructions` array and update the
+   `Expected SHA-256` value. For substantive protocol changes, also bump
+   the sentinel version (`v1` → `v2`) in both `SKILL.md` and the three
+   sentinel fragments in `src/index.ts`.
+4. Merge the skill PR first, tag a new `vaultpilot-skill` release, then
+   merge + publish the matching `vaultpilot-mcp` release.
+5. Bump `CHANGELOG.md` here with the new sentinel and the minimum
+   required `vaultpilot-mcp` version.
+
+### What users see during a version skew
+
+If a user upgrades only one side, every signing flow halts with the
+exact `vaultpilot-preflight skill integrity check FAILED` message. That
+symptom is identical to a real tamper — the fix (`git pull` here and
+`npm update` on `vaultpilot-mcp` until both match) is safe either way,
+but users should NOT bypass the check to "unblock themselves."
+
 ## Use with other agents (non-Claude clients)
 
 The **content** of this skill (the invariants in `SKILL.md`) is agent-agnostic
