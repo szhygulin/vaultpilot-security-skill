@@ -1,4 +1,4 @@
-# vaultpilot-preflight — agent-side skill for `vaultpilot-mcp`
+# VaultPilot Guard — agent-side skill for `vaultpilot-mcp`
 
 An independent Claude Code skill that enforces bytes-verification invariants
 for transactions prepared by [`vaultpilot-mcp`](https://github.com/szhygulin/vaultpilot-mcp).
