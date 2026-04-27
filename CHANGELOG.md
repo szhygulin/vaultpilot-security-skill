@@ -106,6 +106,92 @@ disabled the defense; v0.4.0 makes the defense survive that omission.
   approval class (Invariant #11) to that repo's `SECURITY.md`
   defenses table for documentation symmetry.
 
+## 0.3.1 — Invariant #8 (free-form message signing) + #7 carve-out + Safe note (coordinated with vaultpilot-mcp 0.9.3)
+
+Backfilled — entry was missing from this changelog at release time. Source:
+PR [#5](https://github.com/szhygulin/vaultpilot-security-skill/pull/5),
+merged commit `13a2886`.
+
+- **Invariant #8 — `MESSAGE-PREVIEW` block for `sign_message_btc` /
+  `sign_message_ltc`.** Free-form BIP-137 message signing flows the
+  user-supplied UTF-8 string through user → agent → MCP → device, and
+  a compromised agent or MCP can substitute the message text in flight
+  (the user asks to sign `"I own bc1q...mine"`, the device shows
+  `"I authorize transfer of all funds to bc1q...attacker"`). Invariant
+  #8 has the agent render the EXACT UTF-8 string in a fenced verbatim
+  CHECKS PERFORMED block before invoking the tool, ask the user to
+  confirm character-by-character match against the device screen, and
+  treat any deviation as `✗ MESSAGE-PREVIEW MISMATCH — DO NOT SIGN.`
+- **Invariant #7 carve-out.** Added the on-device sign-message
+  allowlist (contacts CRUD + `sign_message_btc` / `sign_message_ltc`)
+  so any sign-message prompt during a `prepare_*` / `send_transaction`
+  flow triggers the anomaly path.
+- **Safe-multisig note.** Documented that
+  `prepare_safe_tx_propose` / `_approve` / `_execute` are ordinary
+  `eth_sendTransaction` calls (Safe uses on-chain `approveHash`, not
+  EIP-712 typed-data) — the agent decodes the OUTER selector
+  (`Safe.approveHash` / `Safe.execTransaction`) and the INNER tx the
+  Safe is being asked to authorize.
+- **Bumps integrity sentinel to**
+  `VAULTPILOT_PREFLIGHT_INTEGRITY_v4_7655818578c7a044`.
+- **SKILL.md SHA-256:**
+  `cd689838314a700dfff80d4c881bf51190cd6c71c747f3152e7cab8d943df2cc`.
+- **Requires vaultpilot-mcp ≥ 0.9.3** (the release that pinned the v4
+  SHA via [`vaultpilot-mcp` commit `8f22f51`](https://github.com/szhygulin/vaultpilot-mcp/commit/8f22f51)).
+
+## 0.3.0 — Invariant #7 (address-book label decoration + tamper warnings) (coordinated with vaultpilot-mcp 0.9.3)
+
+Backfilled — entry was missing from this changelog at release time. Source:
+PR [#4](https://github.com/szhygulin/vaultpilot-security-skill/pull/4),
+merged commit `7afeb5f`.
+
+- **Invariant #7 — Address-book.** Surfaces label decorations on the
+  recipient line in `CHECKS PERFORMED`:
+  `(contact: <label> — verified)` for label-resolved sends,
+  `(also saved as: <label>)` for reverse-decorated literal addresses,
+  `(resolved via ENS, also saved as: <label>)` for ENS + reverse, and
+  `(unknown — verify on-device)` for clean-but-unsaved destinations.
+  When the verification block carries
+  `⚠ contacts file failed verification`, the agent leads its reply
+  with `⚠ CONTACTS-FILE TAMPER WARNING` and refuses to call
+  `send_transaction` until the user confirms the recipient out-of-band.
+  Cross-checks `verify_contacts({ chain })` after every successful
+  `add_contact` to catch the case where the MCP claims success but the
+  persisted blob doesn't actually verify.
+- **Bumps integrity sentinel to**
+  `VAULTPILOT_PREFLIGHT_INTEGRITY_v3_2d3b876b38550fe5`.
+- **SKILL.md SHA-256:**
+  `21c8c60ac26528732dbe0b40b4be7e4790607db1881489fe4cd1751f75536cd6`.
+- **Requires vaultpilot-mcp ≥ 0.9.3** (the release that pinned the v3
+  SHA via [`vaultpilot-mcp` commit `abf16e3`](https://github.com/szhygulin/vaultpilot-mcp/commit/abf16e3)).
+
+## 0.2.0 — Invariant #6 (NEAR-Intents intermediate-chain cross-check) (coordinated with vaultpilot-mcp 0.9.1)
+
+Backfilled — entry was missing from this changelog at release time. Source:
+PR [#3](https://github.com/szhygulin/vaultpilot-security-skill/pull/3),
+merged commit `90b4432`.
+
+- **Invariant #6 — Cross-chain bridge chain-ID cross-check.** When
+  `prepare_swap` / `prepare_solana_lifi_swap` / `prepare_tron_lifi_swap`
+  returns LiFi `BridgeData` calldata for a CROSS-CHAIN bridge, the
+  skill independently verifies the encoded `destinationChainId`
+  against a chain-ID table baked into the skill (NOT taken from the
+  MCP). An allowlist of known intermediate-chain bridges (NEAR
+  Intents, settling on `1885080386571452`) covers the legitimate case
+  where the bridge encodes its own settlement chain rather than the
+  user's final chain. Any mismatch outside the allowlist is a chain-
+  ID-swap attack and the agent leads with
+  `✗ CHAIN-ID MISMATCH FAILED — DO NOT SIGN.` The skill carries the
+  table independently of the MCP's
+  `src/modules/swap/intermediate-chain-bridges.ts` so a single-side
+  tamper (in either) is caught.
+- **Bumps integrity sentinel to**
+  `VAULTPILOT_PREFLIGHT_INTEGRITY_v2_43b1d2403a0c2a94`.
+- **SKILL.md SHA-256:**
+  `fc4a40469e11156e7cccdc1539b93e430b60a49bf75d01b41de112d8c301f1a8`.
+- **Requires vaultpilot-mcp ≥ 0.9.1** (the release that pinned the v2
+  SHA via [`vaultpilot-mcp` commit `5d495a3`](https://github.com/szhygulin/vaultpilot-mcp/commit/5d495a3)).
+
 ## 0.1.3 — remove Fast-retry mode section (coordinated with vaultpilot-mcp 0.6.1)
 
 - Remove the **Fast-retry mode** section added in 0.1.2. Its consumer —
