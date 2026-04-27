@@ -4,6 +4,71 @@ All notable changes to the `vaultpilot-preflight` skill are documented here.
 The skill is versioned separately from `vaultpilot-mcp` so an MCP compromise
 cannot silently alter the skill's content.
 
+## 0.4.0 — close documented agent-side gaps from `vaultpilot-mcp`'s threat model
+
+Adds four new invariants (#9–#12) and tightens two existing ones (#2, #4),
+all closing gaps where `vaultpilot-mcp`'s `SECURITY.md` documents an
+agent-side defense that the skill did not yet enforce statically. A
+compromised MCP that omits the corresponding server-prose block previously
+disabled the defense; v0.4.0 makes the defense survive that omission.
+
+- **Bumps integrity sentinel to**
+  `VAULTPILOT_PREFLIGHT_INTEGRITY_v5_9c4a2e7f3d816b50`.
+- **Tightens Invariant #2 (hash recompute)** with an explicit `chainId`-
+  field assertion in the EIP-1559 RLP. The hash recompute alone does not
+  catch a chainId swap (the agent recomputes from the same tampered
+  tuple); v0.4.0 adds the cross-check and a `✗ CHAIN-ID FIELD MISMATCH`
+  failure phrasing.
+- **Tightens Invariant #4 (missing-directive detection)** with a chain-
+  conditioned table of the specific MCP-emitted blocks each
+  `prepare_*` / `preview_*` response is required to contain
+  (`PREPARE RECEIPT`, `[CROSS-CHECK SUMMARY]`, `LEDGER BLIND-SIGN HASH`,
+  `LEDGER MESSAGE HASH`, etc.). The agent now names the specific missing
+  block to the user rather than emitting a generic "directive missing"
+  warning.
+- **Adds Invariant #9** — WalletConnect session-topic cross-check (EVM
+  only, before the first `send_transaction` of a session). Catches WC
+  peer-impersonation: any peer can self-report `wallet: "Ledger Wallet"`
+  / `peerUrl: "wc.apps.ledger.com"`, so the name/URL pair is not a
+  trusted identity. The session topic is. The agent surfaces the last
+  8 chars and asks the user to confirm a matching session in
+  Ledger Live → Settings → Connected Apps.
+- **Adds Invariant #10** — `pair_ledger_*` on-device address verification.
+  `pair_ledger_live` / `pair_ledger_solana` / `pair_ledger_tron` establish
+  the trust root for every downstream `prepare_*`. A compromised MCP can
+  return any address as "your Ledger address." The agent now requires the
+  user to read the address character-by-character off the Ledger device
+  and confirm match before treating the pairing as successful or
+  proceeding to any subsequent flow.
+- **Adds Invariant #11** — ERC-20 / Permit2 approval surfacing as an
+  attack class. When decoded calldata is `approve(spender, amount)` /
+  `Permit2.approve(...)` / `permit(...)`, the agent surfaces spender +
+  amount as a distinct CHECKS PERFORMED line; if `amount == 2^256 - 1`,
+  labels `⚠ UNLIMITED APPROVAL` with revoke-path guidance. Defense-in-
+  depth against the case where bytes are honest but the agent's natural-
+  language summary buries the dangerous shape.
+- **Adds Invariant #12** — mandatory unconditional surfacing of
+  `get_verification_artifact` second-LLM check. The defense's "optional
+  to use" property does not extend to "optional to surface": a
+  compromised agent (the threat this defense targets) would simply never
+  mention it. v0.4.0 elevates the v0.3.x CHECKS PERFORMED template's
+  passive `□ SECOND-LLM CHECK — optional` checkbox to a mandatory
+  verbatim sentence the agent emits on every signing flow regardless
+  of whether the user asked.
+- **CHECKS PERFORMED template** updated to include the new
+  CHAIN-ID-FIELD line, an APPROVAL-DETECTED line conditional on
+  Invariant #11, and the mandatory SECOND-LLM-AVAILABLE prose.
+- **Scope** updated: adds `get_ledger_status` (used by Invariant #9) and
+  `sign_message_btc` / `sign_message_ltc` / contacts CRUD as in-scope
+  signing-trust-root tools.
+- **Requires `vaultpilot-mcp` ≥ 0.10.0** (the release that pins the new
+  v5 SHA-256 of this `SKILL.md`). On older MCP versions this skill
+  fails the integrity check and halts signing flows — align versions
+  or stay on skill 0.3.x until the matching MCP release ships. A
+  companion issue in `vaultpilot-mcp` requests adding the phishing-
+  approval class (Invariant #11) to that repo's `SECURITY.md`
+  defenses table for documentation symmetry.
+
 ## 0.1.3 — remove Fast-retry mode section (coordinated with vaultpilot-mcp 0.6.1)
 
 - Remove the **Fast-retry mode** section added in 0.1.2. Its consumer —
