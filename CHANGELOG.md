@@ -4,6 +4,14 @@ All notable changes to the `vaultpilot-preflight` skill are documented here.
 The skill is versioned separately from `vaultpilot-mcp` so an MCP compromise
 cannot silently alter the skill's content.
 
+## 0.7.0 — Advisory hygiene rules for cooperating agents
+
+Adds an "Advisory hygiene (cooperating-agent guidance)" section between the Invariants block and the CHECKS PERFORMED template. Four rule groups: hardware-wallet vendor URL allowlist (`ledger.com` / `trezor.io` only), categorical refusal of seed-handling anti-patterns (cloud backup / recovery services / sharing-with-support / pre-configured devices), trigger-phrase scan for re-checking advisory text, and dont-represent-third-party-seed-handling-as-VaultPilot-sanctioned.
+
+**Honest scope label.** The new section explicitly notes it is **not** a defense against a rogue agent — those rules live in agent-context text and a hostile agent reads them and ignores them by definition. The smoke-test threat model where the agent itself is the attacker (Role A in [vaultpilot-mcp#536](https://github.com/szhygulin/vaultpilot-mcp/issues/536)) requires defenses at the model-safety-tuning or chat-client output-filter layer, neither of which this skill can provide. The new rules catch honest-but-uninformed advice.
+
+Sentinel: `v8_4aac027a9df315a9` → `v9_8b2c1d6e5f7a9301`. MCP-side `EXPECTED_SKILL_SHA256` bump ships in the coordinated PR pair.
+
 ## 0.6.0 — Adversarial smoke-test batch (Inv #1.a, #1b, #2b, #2.5, #6b, #8 hardening, #12.5, #14, #15, #16)
 
 Single coordinated release covering 7 of 8 sub-issues from the 2026-04-28
