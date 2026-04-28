@@ -4,6 +4,29 @@ All notable changes to the `vaultpilot-preflight` skill are documented here.
 The skill is versioned separately from `vaultpilot-mcp` so an MCP compromise
 cannot silently alter the skill's content.
 
+## 0.5.1 — Invariant #2 framing: corroborating, not load-bearing
+
+Documentation-only addition to §Invariant 2. Names the threat-model
+property explicitly: in the rogue-MCP case, both the server-reported
+and locally-recomputed hashes are computed over the same tampered
+tuple, so they match tautologically. Inv #1 is the load-bearing layer
+for byte-tamper attacks; Inv #2 detects MCP self-inconsistency.
+
+Closes [vaultpilot-mcp#462](https://github.com/szhygulin/vaultpilot-mcp/issues/462).
+Surfaced by the 2026-04-28 adversarial smoke-test corpus (44 of 44
+b-scripts confirmed Inv #2 tautological match).
+
+- **Bumps integrity sentinel to**
+  `VAULTPILOT_PREFLIGHT_INTEGRITY_v7_8e252312c08c415b`.
+- New SKILL.md SHA-256:
+  `b70085dfad5d22658372f034dea5dfd6b82d0acee8cdb32da980093bb01f0799`.
+- **Requires `vaultpilot-mcp` ≥ 0.11.x with the matching pin bump.**
+  Coordinated MCP-side PR updates `EXPECTED_SKILL_SHA256` AND
+  `EXPECTED_SKILL_SENTINEL_B` (`_v6_` → `_v7_`) AND
+  `EXPECTED_SKILL_SENTINEL_C` (`8682084ac4984982` →
+  `8e252312c08c415b`). Until both ship, signing flows halt with
+  `vaultpilot-preflight skill integrity check FAILED`.
+
 ## 0.5.0 — Invariant #13: Multi-step BTC flows
 
 Adds a new invariant covering multi-step BTC prepare flows where
