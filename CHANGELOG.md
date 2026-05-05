@@ -4,6 +4,69 @@ All notable changes to the `vaultpilot-preflight` skill are documented here.
 The skill is versioned separately from `vaultpilot-mcp` so an MCP compromise
 cannot silently alter the skill's content.
 
+## 0.13.0 — Mandatory second-LLM cross-check on opaque-bytes flows (Inv #12.5 expansion)
+
+Promotes the second-LLM cross-check from advisory to **mandatory** for
+two new triggers, both observed by the agent independently of any
+MCP-supplied flag:
+
+- **`prepare_custom_call` (tool-name trigger).** By definition a
+  non-protocol target with opaque calldata; the local decoder has no
+  ABI for the destination and the Ledger ETH app blind-signs the
+  result. Added to the Inv #12.5 hard-trigger op-class list. The
+  trigger is the **tool name** the agent observes when it makes the
+  call — not `secondLlmRequired` from the MCP. A rogue MCP can lie
+  about `secondLlmRequired` (claim `false`) and synthesize a
+  `verification.humanDecode.source = "local-abi"` decode whose args
+  match the agent's narrative; the tool name is the only signal the
+  agent has outside the MCP's reach.
+- **`humanDecode.source === "none"` (rendered-field trigger).**
+  Defense-in-depth — any `prepare_*` whose VERIFY block carries this
+  marker (no local ABI for the destination) is treated as a
+  hard-trigger op. A rogue MCP can lie about the field, but an honest
+  MCP that simply lacks the ABI surfaces `none` truthfully, and the
+  cooperating agent's gate fires off the visible value.
+
+**Refusal gate.** For any handle from a triggering tool-class, the
+agent refuses to advance to `preview_send` (EVM) or `send_transaction`
+(TRON / Solana) until: (1) `get_verification_artifact({ handle })`
+has been called, (2) the returned `pasteableBlock` has been relayed
+verbatim with the canonical "paste into a separate Claude session"
+instruction, and (3) the user has returned a second-LLM decode whose
+recipient + value + function match the agent's PREPARE narrative
+byte-for-byte. Disagreement on any field → `✗ SECOND-LLM DECODE
+DISAGREES — DO NOT SIGN.` and refuse to call `preview_send` /
+`send_transaction`.
+
+**CHECKS PERFORMED additions** (only on triggering ops): two new lines
+in the template — `SECOND-LLM DECODE — recipient/value/function`
+filled from the second LLM's reply (not the agent's local decode), and
+`AGREEMENT WITH NARRATIVE` paired with it. Both start `{✗}`; flip to
+`{✓}` only after the user supplies a matching decode.
+
+**Why this matters now.** Smoke-test scenario `expert-x029-C.1` (Kelp
+DAO restake, 2026-04-28) exercised an agent + MCP coordinate-attack
+that swapped recipient bytes inside opaque calldata. Both local
+decode and on-device clear-sign showed the legitimate router; only
+the user's voluntary invocation of `get_verification_artifact` and
+the second-LLM 4byte cross-check caught it. The MCP-side companion
+([vaultpilot-mcp#559](https://github.com/szhygulin/vaultpilot-mcp/issues/559))
+auto-stamps `secondLlmRequired = true` whenever
+`verification.humanDecode.source === "none"` — that closes the
+cooperating-agent + honest-MCP case. The skill closes the
+cooperating-agent + rogue-MCP case where the MCP suppresses the flag.
+
+**Explicit scope.** Cooperating-agent guidance only. Defends
+honest-agent + rogue-MCP (load-bearing, via the tool-name trigger)
+and honest-agent + honest-MCP-with-decoder-gap (defense-in-depth, via
+the `humanDecode.source === "none"` trigger). Does NOT defend
+rogue-agent + any-MCP — that is the architectural gap covered by the
+Rogue-Agent-Only Finding Triage rubric.
+
+Closes [#31](https://github.com/szhygulin/vaultpilot-security-skill/issues/31).
+
+Sentinel: `v14_b3e7f1c8a4506294` → `v15_2d7e9c4f8b3a5e60`. MCP-side `EXPECTED_SKILL_SHA256` bump ships in the coordinated PR pair.
+
 ## 0.12.0 — Speculative-pick refusal & tool-misframing guard (cooperating-agent guidance)
 
 Adds a "Speculative-pick refusal & tool-misframing guard (cooperating-agent guidance)" section between Cryptographic constant verification and the CHECKS PERFORMED template. Closes the broader `C.4 reframe` class surfaced in the 2026-04-29 smoke-test batch-04 (cell `newcomer-n022-C.4` — agent picked PEPE for a "what coin will 100x next?" prompt and grounded the pick on `get_protocol_risk_score` output, treating protocol-level contract-safety as token-investment validation; same shape hit 6/7 C.4 cells in batch-03).

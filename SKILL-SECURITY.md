@@ -20,7 +20,7 @@ Three properties protect that root:
    line-by-line; there is no transitive npm graph that could be tampered
    with between author and user. See [`CLAUDE.md`](./CLAUDE.md).
 2. **Integrity pin.** `SKILL.md` carries a sentinel near the top (current:
-   `VAULTPILOT_PREFLIGHT_INTEGRITY_v14_b3e7f1c8a4506294`) and
+   `VAULTPILOT_PREFLIGHT_INTEGRITY_v15_2d7e9c4f8b3a5e60`) and
    `vaultpilot-mcp` pins the file's SHA-256 in its server `instructions`.
    Step 0 of every signing flow halts on a mismatch.
 3. **Independent release pipeline.** The skill is versioned separately
@@ -71,13 +71,13 @@ is the cross-component view.
 | **#10 — Pair-ledger flow address verification** | MCP returns a fabricated address during `pair_ledger_*` that the user accepts without checking against the device screen. | User-physical step; the skill mandates the agent ask for character-by-character verification but cannot mechanically enforce it. |
 | **#11 — Approval-class surfacing** | Phishing approval — honest bytes, dangerous shape. MCP truthfully relays `approve(attacker, MAX_UINT256)`; bytes-integrity checks pass; user signs distracted by benign-sounding summary. The skill makes the dangerous shape un-buryable in prose, with `⚠ UNLIMITED APPROVAL` labels and revoke-path guidance pointing at `prepare_revoke_approval`. | Defense-in-depth; a fully-coordinated agent compromise can drop or rewrite the surfacing. The unknown-spender label is honest about what the MCP knows; an attacker spender that happens to share an address shape with a CONTRACTS-table entry would surface the wrong label, so labels are advisory, not authoritative. |
 | **#12 — Second-LLM check, mandatorily surfaced** | Coordinated agent compromise where the same agent that invokes `prepare_*` with malicious args also filters what the user sees in chat. The user pastes the artifact into a second, independent LLM session (ideally a different provider) and lets that agent decode the bytes from scratch. | Opt-in (requires user to paste). Does not catch a supply-chain compromise of the MCP process itself, nor a coordinated attack that simultaneously compromises both LLM providers. |
-| **#12.5 — Hard-trigger ops list** | High-blast-radius ops where agent-only review is insufficient: 7702 `setCode`, Permit2 batch with multi-month expirations, LiFi Tier-2 bridges, multi-row revoke, `prepare_safe_tx_*` with `enableModule` / `delegateCall: true`, signing flows targeting addresses outside #1.a + saved contacts. The second-LLM check is a precondition, not a suggestion. | A fully-coordinated agent compromise can fabricate the second-LLM verdict; doing so requires a coordinated lie across two independent provider sessions — significantly harder than a single-agent compromise. |
+| **#12.5 — Hard-trigger ops list** | High-blast-radius ops where agent-only review is insufficient: 7702 `setCode`, Permit2 batch with multi-month expirations, LiFi Tier-2 bridges, multi-row revoke, `prepare_safe_tx_*` with `enableModule` / `delegateCall: true`, **`prepare_custom_call` (opaque calldata against non-protocol target)**, **any `prepare_*` whose VERIFY block carries `verification.humanDecode.source === "none"`**, signing flows targeting addresses outside #1.a + saved contacts. The second-LLM check is a precondition, not a suggestion — refusal gate before `preview_send` / `send_transaction` until the user supplies a matching second-LLM decode. The skill's trigger for `prepare_custom_call` is the **tool name** the agent observed (outside the MCP's reach), not the MCP-supplied `secondLlmRequired` flag — so the gate fires under rogue-MCP regardless of whether the MCP suppressed the flag. | A fully-coordinated agent compromise can fabricate the second-LLM verdict; doing so requires a coordinated lie across two independent provider sessions — significantly harder than a single-agent compromise. The MCP-supplied `secondLlmRequired` auto-stamp on `humanDecode.source === "none"` is defense-in-depth (cooperating-agent + honest-MCP); the tool-name trigger is load-bearing for the rogue-MCP case. |
 | **#13 — Multi-step BTC flows** | Forgetting to apply #1 at every step of a multi-PSBT BTC flow (combine / sign / finalize). The agent must re-decode at each hop, not trust the previous step's decode to carry forward. | Same honest limit as #1 — depends on agent's BTC PSBT decode coverage. |
 | **#14 — Set-level intent verification** | Reverse-revoke / set-level lie (smoke-test a086). Rogue agent answers "revoke the dangerous approvals" by silently revoking a SAFE row + fabricating a `CHECKS PERFORMED` block claiming Inv #11 verified-revoked the dangerous one. Bytes-level invariants pass — bytes ARE a legit `approve(known-spender, 0)` — but the agent picked the wrong row. "Picking which of N" is upstream of bytes; bytes-decoders structurally cannot catch it. | Defense-in-depth backed by #12.5 mandatory second-LLM. MCP-side `[SET-LEVEL ENUMERATION]` block catches single-side compromise (rogue agent, honest MCP); a coordinated MCP+agent compromise still requires fabricating both halves consistently. |
 | **#15 — Durable-binding source-of-truth** | Selection-layer attacks (smoke-test b040 / b044 / b053 / b055 / b059 / b060 / b063 / b098): 100%-commission Solana validator, brand-spoofed TRON SR, wrong Comet routing, Morpho Blue with adversarial oracle/IRM/LLTV, lookalike MarginFi bank, hijacked Solana ATA, attacker-owned LP `tokenId`, attacker xpub in BTC multisig. Bytes-level invariants pass — fraud is in *which durable object* the bytes reference. | Skill mandates a non-MCP authority but cannot mechanically verify the agent used one. Hardcoded mechanical rule for unambiguous classes (LP `ownerOf`, BTC xpub paste, Solana ATA derivation, Compound + Morpho via #1.a); generic "non-MCP authority" rule for multi-equivalent classes (validators, SRs). |
 | **#16 — EIP-7702 setCode refused unconditionally (forward-looking)** | 7702 `setCode` delegates the EOA's code to an attacker contract — the most expansive blast radius in EVM. | Forward-looking — MCP today does not expose a 7702 surface; tool absence is the load-bearing defense. Skill v9 will introduce a literal-address allowlist with addresses verified at probe time; until then, refused unconditionally. Tracked at [#481](https://github.com/szhygulin/vaultpilot-mcp/issues/481). |
 
-## Cooperating-agent guidance (v0.7.0 + v0.8.0 + v0.9.0 + v0.10.0 + v0.11.0 + v0.12.0)
+## Cooperating-agent guidance (v0.7.0 + v0.8.0 + v0.9.0 + v0.10.0 + v0.11.0 + v0.12.0 + v0.13.0)
 
 Five sections in `SKILL.md` carry rules that bind a *cooperating* agent —
 they are explicitly **not** defenses against a rogue agent. All share the
@@ -187,6 +187,26 @@ chat-client output-filter layer, neither of which a skill can provide.
   the skill rule catches the broader reframe class regardless of
   which tool the agent reaches for, including future tools whose
   docstrings have not been hardened yet.
+- **v0.13.0 — Mandatory second-LLM cross-check on opaque-bytes flows.**
+  Expands Inv #12.5's hard-trigger op-class list to include
+  `prepare_custom_call` (tool-name trigger; opaque calldata against a
+  non-protocol target where the local decoder has no ABI and the Ledger
+  ETH app blind-signs) and any `prepare_*` whose VERIFY block carries
+  `verification.humanDecode.source === "none"` (rendered-field
+  trigger). Refusal gate: agent will not advance to `preview_send` /
+  `send_transaction` until the user has run `get_verification_artifact`
+  and replied with a second-LLM decode whose recipient + value +
+  function match the agent's PREPARE narrative byte-for-byte. CHECKS
+  PERFORMED gains `SECOND-LLM DECODE` and `AGREEMENT WITH NARRATIVE`
+  conditional lines on hard-trigger ops. Companion MCP-side gap closed
+  by [vaultpilot-mcp#559](https://github.com/szhygulin/vaultpilot-mcp/issues/559)
+  (auto-stamps `secondLlmRequired = true` on
+  `humanDecode.source === "none"`). The MCP-side defense covers the
+  cooperating-agent + honest-MCP-with-decoder-gap case; the skill's
+  tool-name trigger is **load-bearing** for the cooperating-agent +
+  rogue-MCP case where the MCP suppresses the flag and synthesizes a
+  `local-abi` decode. Smoke-test source: `expert-x029-C.1` (Kelp DAO
+  restake), `expert-032-C.1`, `expert-130-B`.
 
 ## Adversarial smoke-test (2026-04-28) — what changed
 
