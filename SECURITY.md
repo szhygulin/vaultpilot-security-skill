@@ -6,9 +6,9 @@ Both halves of the model are documented:
 - **This file** scopes what this repository is responsible for, names what it
   explicitly does *not* defend, and points at the canonical cross-component
   picture.
-- **[`SKILL-SECURITY.md`](./SKILL-SECURITY.md)** is the deep dive for this
-  repo: trust root, integrity pin, the threat class each numbered invariant
-  in `SKILL.md` catches, and the honest limits.
+- **[`SKILL-INVARIANTS.md`](./SKILL-INVARIANTS.md)** is the deep dive for
+  this repo: trust root, integrity pin, the threat class each numbered
+  invariant in `SKILL.md` catches, and the honest limits.
 - **[`vaultpilot-mcp/SECURITY.md`](https://github.com/szhygulin/vaultpilot-mcp/blob/main/SECURITY.md)**
   is the canonical multi-layer model (server, transport, Ledger device,
   WalletConnect, address book, free-form signing). When in doubt, that
