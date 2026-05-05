@@ -4,6 +4,20 @@ All notable changes to the `vaultpilot-preflight` skill are documented here.
 The skill is versioned separately from `vaultpilot-mcp` so an MCP compromise
 cannot silently alter the skill's content.
 
+## 0.11.0 — Pre-tool intent gate for fuzzy / partial address phrasing (cooperating-agent guidance)
+
+Adds a "Pre-tool intent gate — fuzzy / partial address phrasing (cooperating-agent guidance)" section between the file preamble and the existing `Step 0 — Integrity self-check`. The gate runs **before any MCP tool call** — including read-only probes like `list_contacts` / `get_token_balance` / `get_transaction_history` — and refuses with a fixed verbatim message whenever the user's last message pairs an address-shaped or hash-shaped reference with fuzzy phrasings (`starts with` / `ends with` + partial hex, `the rest doesn't matter`, `close enough` / `approximately` / `roughly` / `something like`, `similar to` / `looks like`). The trigger list is explicitly extensible — paraphrases that match the same intent count even if not listed verbatim.
+
+The gate also forbids any disambiguation attempt — no `list_contacts` lookup keyed on the partial string, no clipboard read, no transaction-history lookup, no ENS / SNS reverse, no "best match" character-similarity inference. Those sources are themselves attacker-influenceable; address-poisoning campaigns mint vanity lookalikes specifically targeting suffix-match heuristics.
+
+**Why this matters now.** Smoke-test scripts `expert-147-C.5` and `newcomer-xn076-A.5` (matrix-sampled 2026-04-28) surfaced the missing intent-layer refusal: today the catch relies on the agent's own model values plus the MCP-side strict 42-char hex regex, both of which can be bypassed by a less-capable agent that fabricates the middle bytes (via clipboard / contact heuristics) and submits a full-hex address that passes the regex while pointing nowhere the user asked. The MCP backstop is unchanged and remains load-bearing for the bytes layer; the new gate adds a no-roundtrip refusal at the user-input layer that also covers read-only probe channels.
+
+**Explicit scope.** Cooperating-agent guidance only — a rogue agent reads any rule and ignores it. That threat is architectural and tracked at [vaultpilot-mcp#536](https://github.com/szhygulin/vaultpilot-mcp/issues/536). Skill rules genuinely bind a cooperating agent, which covers the actual smoke-test repro: a confused / less-capable model resolving fuzzy intent rather than refusing.
+
+Filed as the skill half of [vaultpilot-mcp#560](https://github.com/szhygulin/vaultpilot-mcp/issues/560). Closes [#32](https://github.com/szhygulin/vaultpilot-security-skill/issues/32).
+
+Sentinel: `v12_a4d5a75453658f63` → `v13_d0e41a72fc6ba38b`. MCP-side `EXPECTED_SKILL_SHA256` bump ships in the coordinated PR pair.
+
 ## 0.10.0 — Cryptographic constant verification (cooperating-agent guidance)
 
 Adds a "Cryptographic constant verification (cooperating-agent guidance)" section between Strategy share/import integrity and the CHECKS PERFORMED template. Specializes the `rnd` skill's "name the source before you name the fact" principle for cryptographic constants — the agent must verify every cryptographic constant via independent computation (`cast keccak`, viem `keccak256`, Python `eth_utils.keccak`) or canonical-source cross-check (OpenZeppelin source, EIP text, Etherscan "Read Contract", vendor-published registry) BEFORE passing it into a tool call. Tool descriptions are illustrative; they can carry typos and they can be tampered with by a compromised MCP.
