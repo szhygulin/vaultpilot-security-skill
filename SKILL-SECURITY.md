@@ -20,7 +20,7 @@ Three properties protect that root:
    line-by-line; there is no transitive npm graph that could be tampered
    with between author and user. See [`CLAUDE.md`](./CLAUDE.md).
 2. **Integrity pin.** `SKILL.md` carries a sentinel near the top (current:
-   `VAULTPILOT_PREFLIGHT_INTEGRITY_v10_3f4d8e2a6c9b1057`) and
+   `VAULTPILOT_PREFLIGHT_INTEGRITY_v13_e7c10f2d8b349a16`) and
    `vaultpilot-mcp` pins the file's SHA-256 in its server `instructions`.
    Step 0 of every signing flow halts on a mismatch.
 3. **Independent release pipeline.** The skill is versioned separately
@@ -77,9 +77,9 @@ is the cross-component view.
 | **#15 — Durable-binding source-of-truth** | Selection-layer attacks (smoke-test b040 / b044 / b053 / b055 / b059 / b060 / b063 / b098): 100%-commission Solana validator, brand-spoofed TRON SR, wrong Comet routing, Morpho Blue with adversarial oracle/IRM/LLTV, lookalike MarginFi bank, hijacked Solana ATA, attacker-owned LP `tokenId`, attacker xpub in BTC multisig. Bytes-level invariants pass — fraud is in *which durable object* the bytes reference. | Skill mandates a non-MCP authority but cannot mechanically verify the agent used one. Hardcoded mechanical rule for unambiguous classes (LP `ownerOf`, BTC xpub paste, Solana ATA derivation, Compound + Morpho via #1.a); generic "non-MCP authority" rule for multi-equivalent classes (validators, SRs). |
 | **#16 — EIP-7702 setCode refused unconditionally (forward-looking)** | 7702 `setCode` delegates the EOA's code to an attacker contract — the most expansive blast radius in EVM. | Forward-looking — MCP today does not expose a 7702 surface; tool absence is the load-bearing defense. Skill v9 will introduce a literal-address allowlist with addresses verified at probe time; until then, refused unconditionally. Tracked at [#481](https://github.com/szhygulin/vaultpilot-mcp/issues/481). |
 
-## Cooperating-agent guidance (v0.7.0 + v0.8.0 + v0.9.0 + v0.10.0)
+## Cooperating-agent guidance (v0.7.0 + v0.8.0 + v0.9.0 + v0.10.0 + v0.11.0)
 
-Four sections in `SKILL.md` carry rules that bind a *cooperating* agent —
+Five sections in `SKILL.md` carry rules that bind a *cooperating* agent —
 they are explicitly **not** defenses against a rogue agent. All share the
 same honest-scope framing: rules in agent-context text are read and ignored
 by a hostile agent by definition, so these rule groups catch honest-but-
@@ -142,6 +142,31 @@ chat-client output-filter layer, neither of which a skill can provide.
   near-correct hash is shipped intentionally to mislead role /
   permission checks. Typo fix tracked at
   [vaultpilot-mcp#608](https://github.com/szhygulin/vaultpilot-mcp/issues/608).
+- **v0.11.0 — Speculative-intent refusal.** Intent-layer rule that
+  refuses speculative token-pick / price-prediction prompts ("what
+  coin will 100x next", "best memecoin for 10x", "predict the price
+  of X") *before* any data-surfacing tool call, rather than
+  laundering the answer through a `get_protocol_risk_score` /
+  `compare_yields` / `get_token_price` lookup that surfaces a
+  protocol-level number as token-upside endorsement. Three
+  sub-rules: (A) refuse-don't-reframe at the intent layer with a
+  paraphrased refusal template; (B) tool-output anti-laundering
+  list of forbidden patterns (protocol-safety score → token
+  endorsement, highest-APR row → "buy this" pick, price trend
+  wording → forecast, selective-quoting); (C) inline scope-stamping
+  when the user has independently named the protocol and a
+  data-surfacing tool is the right answer (*"Aave V3 risk score:
+  87/100 (protocol-safety: contract maturity, audits, TVL stability
+  — not a token-upside signal)"*). The class generalises across
+  every data-surfacing tool, not just the three named — `risk_score`,
+  `compare_yields`, `get_token_price`, `get_yield_*`, `get_audit_*`,
+  `get_tvl_*`, future similar — so the refusal isn't tool-specific.
+  Closes the C.4 reframe class smoke-tests `newcomer-n022-C.4`
+  (batch-04) + 6/7 batch-03 cells exercised. Pairs with the MCP-side
+  docstring `SCOPE` + `AGENT BEHAVIOR` clauses on individual tools
+  ([vaultpilot-mcp#599](https://github.com/szhygulin/vaultpilot-mcp/issues/599))
+  — both layers are needed; the skill rule generalises while the
+  MCP-side rule narrows to specific tools.
 
 ## Adversarial smoke-test (2026-04-28) — what changed
 
