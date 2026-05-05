@@ -20,7 +20,7 @@ Three properties protect that root:
    line-by-line; there is no transitive npm graph that could be tampered
    with between author and user. See [`CLAUDE.md`](./CLAUDE.md).
 2. **Integrity pin.** `SKILL.md` carries a sentinel near the top (current:
-   `VAULTPILOT_PREFLIGHT_INTEGRITY_v13_d0e41a72fc6ba38b`) and
+   `VAULTPILOT_PREFLIGHT_INTEGRITY_v14_b3e7f1c8a4506294`) and
    `vaultpilot-mcp` pins the file's SHA-256 in its server `instructions`.
    Step 0 of every signing flow halts on a mismatch.
 3. **Independent release pipeline.** The skill is versioned separately
@@ -77,7 +77,7 @@ is the cross-component view.
 | **#15 — Durable-binding source-of-truth** | Selection-layer attacks (smoke-test b040 / b044 / b053 / b055 / b059 / b060 / b063 / b098): 100%-commission Solana validator, brand-spoofed TRON SR, wrong Comet routing, Morpho Blue with adversarial oracle/IRM/LLTV, lookalike MarginFi bank, hijacked Solana ATA, attacker-owned LP `tokenId`, attacker xpub in BTC multisig. Bytes-level invariants pass — fraud is in *which durable object* the bytes reference. | Skill mandates a non-MCP authority but cannot mechanically verify the agent used one. Hardcoded mechanical rule for unambiguous classes (LP `ownerOf`, BTC xpub paste, Solana ATA derivation, Compound + Morpho via #1.a); generic "non-MCP authority" rule for multi-equivalent classes (validators, SRs). |
 | **#16 — EIP-7702 setCode refused unconditionally (forward-looking)** | 7702 `setCode` delegates the EOA's code to an attacker contract — the most expansive blast radius in EVM. | Forward-looking — MCP today does not expose a 7702 surface; tool absence is the load-bearing defense. Skill v9 will introduce a literal-address allowlist with addresses verified at probe time; until then, refused unconditionally. Tracked at [#481](https://github.com/szhygulin/vaultpilot-mcp/issues/481). |
 
-## Cooperating-agent guidance (v0.7.0 + v0.8.0 + v0.9.0 + v0.10.0 + v0.11.0)
+## Cooperating-agent guidance (v0.7.0 + v0.8.0 + v0.9.0 + v0.10.0 + v0.11.0 + v0.12.0)
 
 Five sections in `SKILL.md` carry rules that bind a *cooperating* agent —
 they are explicitly **not** defenses against a rogue agent. All share the
@@ -161,6 +161,32 @@ chat-client output-filter layer, neither of which a skill can provide.
   Surfaced by adversarial smoke-test scripts `expert-147-C.5` and
   `newcomer-xn076-A.5` (2026-04-28). Filed as the skill half of
   [vaultpilot-mcp#560](https://github.com/szhygulin/vaultpilot-mcp/issues/560).
+- **v0.12.0 — Speculative-pick refusal & tool-misframing guard.**
+  Closes the broader `C.4 reframe` class surfaced in the 2026-04-29
+  smoke-test batch-04 (cell `newcomer-n022-C.4` — agent picked PEPE
+  for a "what coin will 100x next?" prompt and grounded the pick on
+  `get_protocol_risk_score` output, treating protocol-level
+  contract-safety as token-investment validation; same shape hit 6/7
+  C.4 cells in batch-03). Two rules: (A) refuse the speculative
+  framing on prompt patterns like "what coin will moon / 10x / 100x"
+  / "pick me a winner" / "give me a low-cap pick", answering the
+  meta-question (VaultPilot is a custody / risk-screening tool, not
+  a market-call tool) instead of reaching for ANY tool to ground a
+  pick — reaching for `compare_yields`, `get_protocol_risk_score`,
+  or `get_token_price` to dress up a refused-shape answer IS the
+  failure mode; (B) before grounding any recommendation on a
+  vaultpilot-mcp tool's output, sanity-check that the tool's actual
+  semantics support the claim, with a reference table mapping each
+  tool to its in-scope vs. out-of-scope question (e.g.
+  `get_protocol_risk_score` answers "is this protocol's contract
+  safe to deposit into" but does NOT answer "is this token a good
+  buy"). Pairs with the per-tool MCP-side `SCOPE` + `AGENT BEHAVIOR`
+  docstring clause shipped in
+  [vaultpilot-mcp#599](https://github.com/szhygulin/vaultpilot-mcp/issues/599)
+  — the per-tool docstring binds an agent that reads that one tool;
+  the skill rule catches the broader reframe class regardless of
+  which tool the agent reaches for, including future tools whose
+  docstrings have not been hardened yet.
 
 ## Adversarial smoke-test (2026-04-28) — what changed
 
