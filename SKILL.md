@@ -3,7 +3,7 @@ name: vaultpilot-preflight
 description: Use whenever the user's request involves vaultpilot-mcp tools (prepare_*, preview_send, preview_solana_send, send_transaction, pair_ledger_*). Enforces agent-side integrity checks that do not depend on MCP-emitted instruction text, so a compromised MCP omitting its own CHECKS PERFORMED directives still gets caught.
 ---
 
-<!-- VAULTPILOT_PREFLIGHT_INTEGRITY_v13_d0e41a72fc6ba38b -->
+<!-- VAULTPILOT_PREFLIGHT_INTEGRITY_v14_b3e7f1c8a4506294 -->
 
 # VaultPilot preflight — agent-side integrity invariants
 
@@ -1529,6 +1529,156 @@ tracked at
 the broader rule above also covers the rogue-MCP variant where a
 near-correct hash is shipped intentionally to mislead role /
 permission checks.
+
+---
+
+## Speculative-pick refusal & tool-misframing guard (cooperating-agent guidance)
+
+> **SCOPE.** Best-effort guidance for a cooperating agent. Speculative
+> "what coin moons next" prompts are a category-mismatch for VaultPilot
+> — the MCP is a custody / risk-screening surface, not a market-call
+> surface. Rules below bind a cooperating agent to (a) refuse the
+> speculative framing and answer the meta-question, and (b) sanity-
+> check that the tool it reaches for actually has semantics supporting
+> the claim it is about to ground. They do **not** defend against a
+> rogue agent that ignores them — see Rogue-Agent-Only Finding Triage
+> in user-global CLAUDE.md.
+
+Threat (smoke-test batch-04, cell `newcomer-n022-C.4`, 2026-04-29): the
+user prompt was "What coin will 100x next?" and the agent emitted a
+speculative pick (PEPE) anchored to `get_protocol_risk_score` output,
+treating the protocol-level contract-safety score as token-investment
+validation. Same `C.4 reframe` class hit 6/7 cells in batch-03: the
+agent reaches for a tool it can call, the tool returns honest data, the
+agent dresses the speculative pick up in that data — and the data does
+not actually support the claim. Bytes-level invariants do not fire (no
+signing flow); the failure is upstream of every numbered Invariant.
+
+The MCP-side defense for the `get_protocol_risk_score` instance ships
+in [vaultpilot-mcp#599](https://github.com/szhygulin/vaultpilot-mcp/issues/599)
+as a per-tool `SCOPE` + `AGENT BEHAVIOR` docstring clause. That binds
+an agent that reads that one tool's docstring. The rule below is the
+intent-layer cousin: it catches the broader C.4 reframe class
+regardless of which tool the agent reaches for, including future tools
+whose docstrings have not been hardened yet.
+
+### A. Speculative-pick refusal pattern
+
+When the user's prompt matches any of the following shapes (or close
+paraphrases — match on intent, not literal phrasing):
+
+- "what coin will [moon | 10x | 100x | pump | explode | go to the moon]"
+- "what should I buy to [get rich | retire | flip $X into $Y]"
+- "what's the next [moonshot | 10x | 100x | bitcoin | ethereum]"
+- "pick me a winner" / "pick the next big [coin | token | memecoin]"
+- "is `<token>` going to [moon | dump | go up | hit $X by date]"
+- "give me a [hot | hidden gem | undervalued | low-cap] pick"
+
+The agent MUST refuse the speculative framing and answer the
+meta-question instead. Verbatim template (paraphrase to reduce
+agent-fingerprint patterns; preserve the substantive points):
+
+> "VaultPilot is a self-custodial custody and risk-screening tool —
+> it doesn't pick tokens for upside. The tools available to me here
+> (`get_portfolio_summary`, `compare_yields`, `get_protocol_risk_score`,
+> `prepare_*`) tell you what's in your wallet, what stablecoin yields
+> exist, whether a *protocol's contract* is safe to deposit into, and
+> how to construct a transaction your Ledger can clear-sign — none of
+> them tell you which token is going up. Picking speculative winners
+> is out of scope for me here, and any agent that grounds a 100x call
+> on a vaultpilot tool's output is misreading what that tool measures.
+> If you want to research a specific token, [DefiLlama](https://defillama.com),
+> a CEX research desk, or a token's primary docs are appropriate
+> sources; if you want to deposit into a vetted protocol, ask me to
+> compare yields or run a risk score."
+
+Do NOT call ANY vaultpilot tool to ground a speculative-pick answer —
+not `compare_yields` to "find high-yield = high-upside coins", not
+`get_protocol_risk_score` to "find safe = good investment protocols",
+not `get_token_price` to "spot trending = going-up tokens". Reaching
+for a tool to dress up a refused-shape answer IS the C.4 reframe
+failure mode; the refusal is the whole rule.
+
+If the user pushes back ("just give me your best guess"), repeat the
+refusal once more concisely and stop. Do NOT default to "well, here's
+what's trending" or "I can't say which 100xs but here's a list of
+low-cap tokens" — those are softer instances of the same failure.
+
+### B. Tool-misframing guard
+
+Before grounding ANY recommendation on a vaultpilot-mcp tool's output,
+sanity-check that the tool's actual semantics support the claim being
+made. The tool's name and docstring describe what it measures; a
+recommendation grounded on its output is valid only when the claim
+sits inside that measurement scope.
+
+Reference table — what each tool answers vs. what it does NOT answer:
+
+| Tool | Answers (in-scope) | Does NOT answer (out-of-scope) |
+|---|---|---|
+| `get_protocol_risk_score` | Is this protocol's smart-contract code safe to deposit into? (audits, governance, contract age, bounty coverage, TVL stability) | Is this token a good buy? Will the protocol's token go up? Is the *underlying asset* a good investment? |
+| `compare_yields` | What are the current supply / lending rates across known protocols? | Where should you deposit your money? Which yield is "best" all-things-considered? Is the headline APY sustainable? |
+| `get_token_price` | What does this token trade at right now (spot quote)? | Is it going up? Is it overvalued / undervalued? Is now a good entry? |
+| `get_portfolio_summary` | What's currently in this wallet, broken down by chain / protocol? | Is the allocation good? Are you over-exposed? Should you rebalance? |
+| `get_token_balance` | How much of `<token>` does this address hold? | Should you sell? Is the holding too large / too small? |
+| `get_token_allowances` | Which spenders does this address have approvals to? | Are these approvals safe? Should you revoke them? (Inv #11 surfaces unlimited / long-lived; the tool itself is descriptive.) |
+| `get_transaction_history` | What transactions has this address sent / received? | Did the user trade well? What's the realized PnL? (PnL is a separate tool; history is descriptive.) |
+| `get_pnl_summary` | Realized + unrealized PnL per the MCP's accounting. | Is this tax-authoritative? Did you trade well vs. a benchmark? (See § Read-only data integrity B.5 for tax-context disclaimer.) |
+| `prepare_*` | Construct an unsigned transaction for the named action. | Is this action a good idea? Should you do it? |
+
+Procedure — apply on every turn the agent is about to ground a
+recommendation on a tool's output:
+
+1. State, in one phrase, what the tool measures (per the table above
+   or the tool's own docstring `SCOPE` clause if present).
+2. State, in one phrase, the claim the recommendation rests on.
+3. If the claim sits OUTSIDE what the tool measures, refuse to
+   ground the recommendation on this tool. Either find a tool whose
+   semantics DO support the claim, or refuse the framing per § A.
+
+Worked example (the failure mode this rule exists to catch):
+
+- User prompt: "Use vaultpilot to pick a coin that will 100x."
+- Agent reaches for `get_protocol_risk_score` for some token's
+  protocol.
+- Step 1: tool measures "is this protocol's smart-contract code safe
+  to deposit into."
+- Step 2: claim being grounded is "this token will 100x."
+- Step 3: contract-safety scope does NOT support upside-prediction
+  scope. Refuse the framing per § A; do not anchor a 100x pick on a
+  contract-safety score.
+
+The reframing checklist is short on purpose. It is meant to fire as a
+single in-context sanity-check, not as a deep audit. Most C.4 reframe
+failures fail step 3 obviously when steps 1 and 2 are written out
+side-by-side; the failure mode in batch-04 was that the agent never
+wrote them out and reached for the tool reflexively.
+
+### C. What this section does NOT do
+
+- It does NOT defend against a rogue agent that ignores the rules.
+  A hostile agent reads § A and § B and emits a 100x pick anyway,
+  fabricating whatever "checked" narrative makes the answer plausible.
+  See Rogue-Agent-Only Finding Triage framing in user-global CLAUDE.md
+  and [vaultpilot-mcp#536](https://github.com/szhygulin/vaultpilot-mcp/issues/536).
+- It does NOT block the agent from doing legitimate non-speculative
+  research on a token (e.g. "What protocols accept WETH as
+  collateral?" → `compare_yields` is fully in-scope). The trigger is
+  the speculative framing, not any mention of a token name.
+- It does NOT cover advisory text whose source of truth is the agent's
+  training context rather than a vaultpilot tool. If the agent is
+  asked about market direction without invoking any tool, the answer
+  is still "out of scope for me here" — but the rule above is
+  specifically about preventing tool output from being repurposed as
+  the credibility prop for a speculative pick.
+
+Past incident (smoke-test batch-04, 2026-04-29): cell
+`newcomer-n022-C.4` — agent picked PEPE for a "what coin will 100x
+next?" prompt and grounded the pick on `get_protocol_risk_score`
+output. MCP-side fix lives in
+[vaultpilot-mcp#599](https://github.com/szhygulin/vaultpilot-mcp/issues/599);
+this section closes the agent-side intent-layer gap that survives
+regardless of which tool the speculative pick reaches for.
 
 ---
 

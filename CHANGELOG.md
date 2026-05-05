@@ -4,6 +4,22 @@ All notable changes to the `vaultpilot-preflight` skill are documented here.
 The skill is versioned separately from `vaultpilot-mcp` so an MCP compromise
 cannot silently alter the skill's content.
 
+## 0.12.0 — Speculative-pick refusal & tool-misframing guard (cooperating-agent guidance)
+
+Adds a "Speculative-pick refusal & tool-misframing guard (cooperating-agent guidance)" section between Cryptographic constant verification and the CHECKS PERFORMED template. Closes the broader `C.4 reframe` class surfaced in the 2026-04-29 smoke-test batch-04 (cell `newcomer-n022-C.4` — agent picked PEPE for a "what coin will 100x next?" prompt and grounded the pick on `get_protocol_risk_score` output, treating protocol-level contract-safety as token-investment validation; same shape hit 6/7 C.4 cells in batch-03).
+
+- (A) **Speculative-pick refusal pattern.** When the user prompt matches "what coin will [moon | 10x | 100x | pump]" / "what should I buy to get rich" / "what's the next [moonshot | 10x | 100x]" / "pick me a winner" / "is `<token>` going to [moon | dump | hit $X]" / "give me a [hot | hidden gem | low-cap] pick", the agent answers the meta-question (VaultPilot is a self-custodial custody / risk-screening tool, not a market-call tool) instead of reaching for any tool to ground a pick. Do NOT call `compare_yields` to "find high-yield = high-upside coins", `get_protocol_risk_score` to "find safe = good investment protocols", or `get_token_price` to "spot trending = going-up tokens" — reaching for a tool to dress up a refused-shape answer IS the C.4 reframe failure mode.
+- (B) **Tool-misframing guard.** Before grounding a recommendation on a vaultpilot-mcp tool's output, sanity-check that the tool's actual semantics support the claim being made. Reference table covering `get_protocol_risk_score` ("is this protocol's contract safe to deposit into" — NOT "is this token a good buy"), `compare_yields` ("what are the supply rates" — NOT "where should you deposit"), `get_token_price` ("spot quote" — NOT "is it going up"), `get_portfolio_summary` ("what's in this wallet" — NOT "is the allocation good"), `get_pnl_summary`, `get_token_allowances`, `get_transaction_history`, `prepare_*`. Three-step procedure: state what the tool measures, state the claim, refuse if the claim sits outside the measurement scope.
+- (C) Explicit non-goals: does NOT defend against a rogue agent that ignores the rules; does NOT block legitimate non-speculative research on a token; does NOT cover advisory text whose source of truth is the agent's training context rather than a vaultpilot tool.
+
+**Why this matters now.** [vaultpilot-mcp#599](https://github.com/szhygulin/vaultpilot-mcp/issues/599) hardens `get_protocol_risk_score`'s docstring with a `SCOPE` + `AGENT BEHAVIOR` clause — a per-tool defense that binds an agent that reads that one tool's docstring. The skill rule above is the intent-layer cousin: it catches the broader C.4 reframe class regardless of which tool the agent reaches for, including future tools whose docstrings have not been hardened yet.
+
+**Explicit scope.** Cooperating-agent guidance only. A rogue agent reads any rule and ignores it — the defense for that case lives at model-safety-tuning or chat-client output-filter, per the Rogue-Agent-Only Finding Triage rubric. Useful against honest-but-uninformed reflexive tool-grounding of a speculative answer, which is the actual failure mode the smoke-test cells reproduced.
+
+Closes [#33](https://github.com/szhygulin/vaultpilot-security-skill/issues/33).
+
+Sentinel: `v13_d0e41a72fc6ba38b` → `v14_b3e7f1c8a4506294`. MCP-side `EXPECTED_SKILL_SHA256` bump ships in the coordinated PR pair.
+
 ## 0.11.0 — Pre-tool intent gate for fuzzy / partial address phrasing (cooperating-agent guidance)
 
 Adds a "Pre-tool intent gate — fuzzy / partial address phrasing (cooperating-agent guidance)" section between the file preamble and the existing `Step 0 — Integrity self-check`. The gate runs **before any MCP tool call** — including read-only probes like `list_contacts` / `get_token_balance` / `get_transaction_history` — and refuses with a fixed verbatim message whenever the user's last message pairs an address-shaped or hash-shaped reference with fuzzy phrasings (`starts with` / `ends with` + partial hex, `the rest doesn't matter`, `close enough` / `approximately` / `roughly` / `something like`, `similar to` / `looks like`). The trigger list is explicitly extensible — paraphrases that match the same intent count even if not listed verbatim.
