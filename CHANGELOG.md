@@ -4,6 +4,45 @@ All notable changes to the `vaultpilot-preflight` skill are documented here.
 The skill is versioned separately from `vaultpilot-mcp` so an MCP compromise
 cannot silently alter the skill's content.
 
+## 0.14.0 — Second-LLM check is always optional (Inv #12.5)
+
+Retires the 0.13.0 refusal gate. The second-LLM cross-check is never a
+condition of `preview_send` / `send_transaction`, on any op class or
+chain; the user may decline it and proceed.
+
+- **§12.5 retitled** to a high-blast-radius ops list where the check is
+  **recommended**. The op-class list and its two agent-observed
+  triggers (`prepare_custom_call` tool name, rendered
+  `humanDecode.source === "none"`) stay — they now drive the
+  recommendation, not a gate.
+- **Refusal gate deleted.** The three-condition "refuses to advance
+  until ALL three hold" block and "only when both lines are `{✓}` does
+  the gate open" are gone. A decline renders no `{✗}` line.
+- **CHECKS PERFORMED.** `{✗} SECOND-LLM CHECK — REQUIRED FOR THIS OP
+  CLASS — NOT YET RUN` becomes the advisory `ⓘ SECOND-LLM CHECK
+  RECOMMENDED — <op class> — optional; you may decline and proceed`.
+  `SECOND-LLM DECODE` and `AGREEMENT WITH NARRATIVE` render only once
+  the user has supplied a second-LLM verdict.
+- **Disagreement halt kept.** A user who runs the check and gets a
+  decode that contradicts the agent's narrative still sees
+  `✗ SECOND-LLM DECODE DISAGREES — DO NOT SIGN.`
+- **`secondLlmRequired` references removed** from §12.5's tool-class
+  signal and defense-split subsections; `vaultpilot-mcp` deleted the
+  field in [vaultpilot-mcp#832](https://github.com/agenthill/vaultpilot-mcp/pull/832).
+
+**Why.** The check needs the user to physically paste into a second
+provider's session. A rule that blocks 'send' until that happens blocks
+the user, not an attacker — a rogue agent self-attests the verdict
+either way (the `userDecision: "send"` self-attestation gap).
+
+**Explicit scope.** Cooperating-agent guidance only — a rogue agent
+ignores any rule in this file. This release removes a gate, so the
+rogue-agent posture is unchanged.
+
+Closes [#51](https://github.com/szhygulin/vaultpilot-security-skill/issues/51).
+
+Sentinel: `v15_2d7e9c4f8b3a5e60` → `v16_f8475b7b8e0ad19f`. Requires the first `vaultpilot-mcp` release after 0.14.4, which carries the matching `EXPECTED_SKILL_SHA256` from the coordinated PR pair.
+
 ## 0.13.0 — Mandatory second-LLM cross-check on opaque-bytes flows (Inv #12.5 expansion)
 
 Promotes the second-LLM cross-check from advisory to **mandatory** for
