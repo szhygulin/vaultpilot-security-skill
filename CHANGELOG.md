@@ -4,6 +4,29 @@ All notable changes to the `vaultpilot-preflight` skill are documented here.
 The skill is versioned separately from `vaultpilot-mcp` so an MCP compromise
 cannot silently alter the skill's content.
 
+## 0.15.0 — LiFi on-chain destination IDs (Inv #6)
+
+- Remove the false NEAR intermediate-chain exception. Every bridge label
+  must match the on-chain ID selected solely by the user's requested chain.
+- Correct TRON's BridgeData ID to `1885080386571452`; distinguish the API
+  ID `728126428`, which is not accepted in the calldata comparison.
+- Require the decoded chain name and ID in CHECKS PERFORMED. Preserve
+  receiver checks and state that matching BridgeData does not prove opaque
+  facet routing or recipient correctness.
+- Ground the non-EVM IDs in pinned LiFi contract source and align the
+  companion MCP module reference and invariant #6b wording.
+
+Cooperating-agent guidance only — a rogue agent can ignore these rules.
+Companion fix: [MCP #799](https://github.com/agenthill/vaultpilot-mcp/issues/799),
+[MCP PR #868](https://github.com/agenthill/vaultpilot-mcp/pull/868).
+
+Closes [#53](https://github.com/szhygulin/vaultpilot-security-skill/issues/53).
+
+Sentinel: `v16_f8475b7b8e0ad19f` → `v17_accad44c20cf5141`.
+Requires the MCP release containing PR #868 and its matching integrity pin.
+Merge and release the skill first, then publish the matching MCP release;
+users must update both sides to avoid an integrity-check mismatch.
+
 ## 0.14.0 — Second-LLM check is always optional (Inv #12.5)
 
 Retires the 0.13.0 refusal gate. The second-LLM cross-check is never a
