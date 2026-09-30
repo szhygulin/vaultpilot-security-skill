@@ -4,6 +4,27 @@ All notable changes to the `vaultpilot-preflight` skill are documented here.
 The skill is versioned separately from `vaultpilot-mcp` so an MCP compromise
 cannot silently alter the skill's content.
 
+## 0.16.0 — Kamino reserve in Inv #15
+
+- Add the Kamino reserve to the durable-binding object classes. A mint can
+  be listed as several reserves (USDC has four: one active, three hidden and
+  near-empty), so a builder that resolves a mint to a reserve can bind a
+  supply / borrow / withdraw / repay to the wrong one.
+- Source of truth: the reserve recorded in the user's Kamino obligation
+  account on-chain for withdraw / repay (`get_kamino_positions` corroborates
+  only); the Kamino app's reserve list, the active reserve, for supply / borrow.
+
+Cooperating-agent guidance only — a rogue agent can ignore these rules.
+Companion fix: [MCP PR #869](https://github.com/agenthill/vaultpilot-mcp/pull/869),
+integrity pin [MCP PR #871](https://github.com/agenthill/vaultpilot-mcp/pull/871).
+
+Closes [#55](https://github.com/szhygulin/vaultpilot-security-skill/issues/55).
+
+Sentinel: `v17_accad44c20cf5141` → `v18_33a5b8d35e0c9f7d`.
+Requires the MCP release containing PR #871 (the matching integrity pin).
+Merge and release the skill first, then publish the matching MCP release;
+users must update both sides to avoid an integrity-check mismatch.
+
 ## 0.15.0 — LiFi on-chain destination IDs (Inv #6)
 
 - Remove the false NEAR intermediate-chain exception. Every bridge label
