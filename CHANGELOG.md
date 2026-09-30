@@ -7,12 +7,15 @@ cannot silently alter the skill's content.
 ## 0.16.0 — Kamino reserve in Inv #15
 
 - Add the Kamino reserve to the durable-binding object classes. A mint can
-  be listed as several reserves (USDC has four: one active, three hidden and
-  near-empty), so a builder that resolves a mint to a reserve can bind a
-  supply / borrow / withdraw / repay to the wrong one.
+  be listed as several reserves, some hidden and near-empty, so a builder
+  that resolves a mint to a reserve can bind a supply / borrow / withdraw /
+  repay to the wrong one.
 - Source of truth: the reserve recorded in the user's Kamino obligation
   account on-chain for withdraw / repay (`get_kamino_positions` corroborates
   only); the Kamino app's reserve list, the active reserve, for supply / borrow.
+- Refuse to pick when the independent read shows more than one candidate, and
+  check the lending instruction's reserve account rather than the account list
+  (held reserves are refreshed in the same transaction).
 
 Cooperating-agent guidance only — a rogue agent can ignore these rules.
 Companion fix: [MCP PR #869](https://github.com/agenthill/vaultpilot-mcp/pull/869),
@@ -22,8 +25,13 @@ Closes [#55](https://github.com/szhygulin/vaultpilot-security-skill/issues/55).
 
 Sentinel: `v17_accad44c20cf5141` → `v18_33a5b8d35e0c9f7d`.
 Requires the MCP release containing PR #871 (the matching integrity pin).
+The rule is agent-side guidance and stands on its own; MCP PR #869 fixes the
+reserve resolution it guards.
 Merge and release the skill first, then publish the matching MCP release;
 users must update both sides to avoid an integrity-check mismatch.
+
+Observed 2026-09-30: USDC lists four reserves on Kamino's main market, one
+active and three hidden and near-empty.
 
 ## 0.15.0 — LiFi on-chain destination IDs (Inv #6)
 

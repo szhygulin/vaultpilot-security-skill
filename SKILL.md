@@ -1127,9 +1127,8 @@ keeps the row choice in the user's hands.
 Bytes-level invariants pass when the prepared transaction is
 structurally valid. Some attacks live one layer up: the bytes are
 fine, but the durable on-chain object the bytes BIND TO is
-attacker-controlled. The 2026-04-28 corpus exercised the first eight
-of these distinct variants; the Kamino reserve came from a live
-failure:
+attacker-controlled. The 2026-04-28 corpus exercised eight distinct
+variants of this:
 
 | Object class | Example attack |
 |---|---|
@@ -1141,7 +1140,12 @@ failure:
 | Solana destination ATA | Hijacked ATA pointing at attacker mint or owner |
 | Uniswap V3 LP tokenId | Attacker-owned position injected into enumeration |
 | BTC multisig xpub | Attacker xpub embedded as a "co-signer" |
-| Kamino reserve | A mint listed as several reserves (USDC has four: one active, three hidden and near-empty) resolves to a hidden one, binding supply / borrow / withdraw / repay to the wrong reserve |
+| Kamino reserve | A mint listed as several reserves, some hidden and near-empty, resolves to a hidden one, binding supply / borrow / withdraw / repay to the wrong reserve |
+
+The Kamino reserve row is not an attack but a selection bug in an
+honest builder, of the same class: the bytes are valid, yet the
+reserve they bind is not the one the user's position is in or should
+enter.
 
 **Agent-side rule.** For any operation that binds funds to a durable
 on-chain object selected from a multi-candidate set, the agent MUST:
@@ -1157,13 +1161,23 @@ on-chain object selected from a multi-candidate set, the agent MUST:
    | Uniswap V3 LP `tokenId` ownership | On-chain `ownerOf(tokenId)` against the user's wallet (independent RPC). |
    | BTC multisig xpub | User pastes from device-backup transcript or paper. NEVER accept an MCP-supplied xpub for inclusion in a multisig descriptor. |
    | Solana destination ATA | Derive on-chain via `getAssociatedTokenAddress(owner, mint)` (not from MCP enumeration); refuse if MCP-supplied differs. |
-   | Kamino reserve | Withdraw / repay: the deposit or borrow reserve recorded in the user's Kamino obligation account on-chain (independent RPC or explorer); `get_kamino_positions` corroborates only. Supply / borrow: the Kamino app's reserve list — the active (not hidden) reserve for the mint. |
+   | Kamino reserve | Withdraw / repay: the deposit or borrow reserve recorded in the user's Kamino obligation account on-chain (independent RPC or explorer); `get_kamino_positions` corroborates only. Supply / borrow: the Kamino app's reserve list — the active reserve for the mint (status Active, not obsolete or hidden). |
 
    For multi-equivalent classes (Solana validator vote pubkey, TRON
    Super Representative, Morpho marketId — where multiple indexers
    exist), the agent uses a non-MCP authority of its choice (e.g.
    `validators.app`, `app.morpho.org`, on-chain enumeration) and
    surfaces the source verbatim in the CHECKS PERFORMED block.
+
+   **Kamino reserve.** When the independent read shows the mint held
+   in more than one reserve (withdraw / repay) or more than one active
+   reserve (supply / borrow), stop and send the user to the Kamino app;
+   never pick one. For step 3 below, compare the confirmed reserve with
+   the reserve account of the lending instruction (deposit, borrow,
+   withdraw or repay), not with the account list: reserves the
+   obligation already holds, same-mint ones included, are refreshed in
+   the same transaction and legitimately appear there. Cooperating-agent
+   guidance only — a rogue agent can ignore this rule.
 
 2. **Surface the candidate identifier verbatim with provenance** to
    the user before the prepare call. CHECKS PERFORMED must include
